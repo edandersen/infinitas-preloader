@@ -22,7 +22,7 @@ namespace InfinitasPreloader
         public static int total = 0;
         public static int completed = 0;
            
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             if (args.Length > 0 && args.First() == "-convert")
             {
@@ -40,19 +40,38 @@ namespace InfinitasPreloader
                 return;
             }
 
-            var infinitasResourcePath = (string)Registry.LocalMachine.OpenSubKey("SOFTWARE").OpenSubKey("KONAMI").OpenSubKey("beatmania IIDX INFINITAS").GetValue("ResourceDir");
+            var infinitasResourcePath = "";
+
+            try
+            {
+                var key = Registry.LocalMachine.OpenSubKey("SOFTWARE");
+                key = key.OpenSubKey("KONAMI");
+                key = key.OpenSubKey("beatmania IIDX INFINITAS");
+                infinitasResourcePath = (string)key.GetValue("ResourceDir");
+            } 
+            catch (NullReferenceException ex)
+            {
+                Console.WriteLine("Could not load Infinitas resource path - is Infinitas actually installed?");
+                Console.WriteLine("Error was: " + ex.Message);
+                Console.WriteLine("Source: " + ex.ToString());
+                Console.WriteLine("Press any key to exit.");
+                Console.ReadKey();
+                return;
+            }
+
 
             Console.WriteLine($"Infinitas resource path is {infinitasResourcePath}");
 
             var files = File.ReadAllLines("filelist.csv").Select(l => new KonmaiFile() { ResourceFilename = l.Split(',')[0], Url = l.Split(',')[1] }).ToList();
             total = files.Count;
-            
-            foreach(var file in files)
-            {
-                DownloadFile(file, infinitasResourcePath).Wait(); // do these in parallel one day if I can figure out the konami limits
-            }
+
+            var downloadTasks = files.Select(f => DownloadFile(f, infinitasResourcePath)).ToArray();
+
+            await Task.WhenAll(downloadTasks);
 
             Console.WriteLine("Complete!");
+            Console.WriteLine("Press any key to exit.");
+            Console.ReadKey();
 
         }
 
@@ -65,7 +84,7 @@ namespace InfinitasPreloader
                 {
                     using (var client = new HttpClient())
                     {
-                        var url = $"http://atnrsc.konaminet.jp/atn/bm2dx/infinitas/v2/appdata{file.Url}";
+                        var url = $"https://d1rc4pwxnc0pe0.cloudfront.net/v2/resource/distribution/ondemand{file.Url}";
                         var response = await client.GetAsync(url);
                         if (response.IsSuccessStatusCode)
                         {

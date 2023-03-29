@@ -13,6 +13,6 @@ This app pre-downloads some music/movie/layer files direct from Konami to the II
 
 ### Notes and limitations
 
-The file list is currently limited to resource pack version 2021100600. To update the filelist.csv file, place a decrypted ```downloadlist.xml``` file next to the exe and run it with the ```-convert``` switch.
+The file list is currently limited to resource pack version P2D:2023022000. To update the filelist.csv file, place a decrypted ```downloadlist.xml``` file next to the exe and run it with the ```-convert``` switch.
 
 Some downloads might fail or the app might hang. Just run the app again and it will only download what it didn't manage to get the first time. Likewise it will also "fill in" the gaps in your download list (of songs it knows about).
