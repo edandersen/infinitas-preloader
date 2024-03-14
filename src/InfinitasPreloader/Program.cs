@@ -17,6 +17,7 @@ namespace InfinitasPreloader
         {
             public string ResourceFilename { get; set; }
             public string Url { get; set; }
+            public int Size { get; set; }
         }
 
         public static int total = 0;
@@ -62,12 +63,17 @@ namespace InfinitasPreloader
 
             Console.WriteLine($"Infinitas resource path is {infinitasResourcePath}");
 
-            var files = File.ReadAllLines("filelist.csv").Select(l => new KonmaiFile() { ResourceFilename = l.Split(',')[0], Url = l.Split(',')[1] }).ToList();
+            var files = File.ReadAllLines("filelist.csv").Select(l => new KonmaiFile() { ResourceFilename = l.Split(',')[0], Url = l.Split(',')[1], Size = Int32.Parse(l.Split(',')[2]) }).ToList();
             total = files.Count;
 
-            var downloadTasks = files.Select(f => DownloadFile(f, infinitasResourcePath)).ToArray();
+            foreach(var file in files)
+            {
+                // don't do this in parallel. There now appears to be rate limiting.
+                await DownloadFile(file, infinitasResourcePath);
+            }
 
-            await Task.WhenAll(downloadTasks);
+            //var downloadTasks = files.Select(f => DownloadFile(f, infinitasResourcePath)).ToArray();
+            //await Task.WhenAll(downloadTasks);
 
             Console.WriteLine("Complete!");
             Console.WriteLine("Press any key to exit.");
@@ -80,11 +86,12 @@ namespace InfinitasPreloader
             try
             {
                 var targetFile = resourcePath + "dlcache" + file.ResourceFilename.Replace("/", "\\");
-                if (!File.Exists(targetFile))
+                if (!File.Exists(targetFile) || (File.Exists(targetFile) && (new FileInfo(targetFile).Length != file.Size)))
                 {
                     using (var client = new HttpClient())
                     {
-                        var url = $"https://d1rc4pwxnc0pe0.cloudfront.net/v2/resource/distribution/ondemand{file.Url}";
+                        client.DefaultRequestHeaders.Add("User-Agent", "KONAMI AMUSEMENT GAME STATION AGENT");
+                        var url = $"https://d1rc4pwxnc0pe0.cloudfront.net/v3/resource/distribution/ondemand{file.Url}";
                         var response = await client.GetAsync(url);
                         if (response.IsSuccessStatusCode)
                         {
@@ -138,6 +145,7 @@ namespace InfinitasPreloader
 
                 file.ResourceFilename = level1Element.Element("savePath").Value;
                 file.Url = level1Element.Element("urlPath").Value;
+                file.Size = Int32.Parse(level1Element.Element("size").Value);
 
                 files.Add(file);
             }
@@ -146,7 +154,7 @@ namespace InfinitasPreloader
             {
                 foreach (var file in files)
                 {
-                    writer.WriteLine(file.ResourceFilename + "," + file.Url);
+                    writer.WriteLine(file.ResourceFilename + "," + file.Url + "," + file.Size);
                 }
             }
 
