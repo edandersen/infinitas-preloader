@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -17,7 +19,7 @@ namespace InfinitasPreloader
         {
             public string ResourceFilename { get; set; }
             public string Url { get; set; }
-            public int Size { get; set; }
+            public string Md5 { get; set; }
         }
 
         public static int total = 0;
@@ -63,7 +65,7 @@ namespace InfinitasPreloader
 
             Console.WriteLine($"Infinitas resource path is {infinitasResourcePath}");
 
-            var files = File.ReadAllLines("filelist.csv").Select(l => new KonmaiFile() { ResourceFilename = l.Split(',')[0], Url = l.Split(',')[1], Size = Int32.Parse(l.Split(',')[2]) }).ToList();
+            var files = File.ReadAllLines("filelist.csv").Select(l => new KonmaiFile() { ResourceFilename = l.Split(',')[0], Url = l.Split(',')[1], Md5 = l.Split(',')[2] }).ToList();
             total = files.Count;
 
             foreach(var file in files)
@@ -86,7 +88,7 @@ namespace InfinitasPreloader
             try
             {
                 var targetFile = resourcePath + "dlcache" + file.ResourceFilename.Replace("/", "\\");
-                if (!File.Exists(targetFile) || (File.Exists(targetFile) && (new FileInfo(targetFile).Length != file.Size)))
+                if (!File.Exists(targetFile) || (File.Exists(targetFile) && (CalculateMD5(targetFile).ToLowerInvariant() != file.Md5.ToLowerInvariant())))
                 {
                     using (var client = new HttpClient())
                     {
@@ -113,6 +115,7 @@ namespace InfinitasPreloader
 
                 } else
                 {
+                    Console.WriteLine($"[{completed}/{total}] File " + file.ResourceFilename + " exists with hash " + file.Md5);
                     completed++;
                 }
 
@@ -145,7 +148,7 @@ namespace InfinitasPreloader
 
                 file.ResourceFilename = level1Element.Element("savePath").Value;
                 file.Url = level1Element.Element("urlPath").Value;
-                file.Size = Int32.Parse(level1Element.Element("size").Value);
+                file.Md5 = level1Element.Element("md5").Value;
 
                 files.Add(file);
             }
@@ -154,12 +157,26 @@ namespace InfinitasPreloader
             {
                 foreach (var file in files)
                 {
-                    writer.WriteLine(file.ResourceFilename + "," + file.Url + "," + file.Size);
+                    writer.WriteLine(file.ResourceFilename + "," + file.Url + "," + file.Md5);
                 }
             }
 
             Console.WriteLine("Written filelist.csv");
             return;
+        }
+
+        static string CalculateMD5(string filename)
+        {
+            using (var md5 = MD5.Create())
+            {
+                using (var stream = File.OpenRead(filename))
+                {
+                    var hash = md5.ComputeHash(stream);
+                    var hyphenless = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                    //Console.WriteLine("MD5 of " + filename + " is " + hyphenless);
+                    return hyphenless;
+                }
+            }
         }
     }
 }
